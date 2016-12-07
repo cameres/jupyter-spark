@@ -117,6 +117,21 @@ var get_status_class = function(status) {
     return status_class;
 }
 
+var stop_running_job = function(event, other){
+    // find the currently running job?
+    $.ajax({
+        type: "POST",
+        url: 'http://localhost:4040/stages/stage/kill/',
+        data: {
+            id : jobs_in_cache,
+            terminate: true
+        },
+        success: function(){
+            console.log('killed the currently running job');
+        }
+    });
+}
+
 var create_progress_bar = function(status_class, completed, total) {
     // progress defined in percent
     var progress = completed / total * 100;
@@ -124,18 +139,42 @@ var create_progress_bar = function(status_class, completed, total) {
     var progress_bar_div = $('<div/>')
         .addClass('progress')
         .css({'min-width': '100px', 'margin-bottom': 0});
+    // debugger
+    // add element for deleting the job
+    var stop_job_button = $('<div/>')
+        .addClass('stop-job-button')
+        .text('Stop')
+        .css('color', 'white')
+        .css('background-color', '#f44336')
+        .css('border', 'none')
+        .css('padding', '1px 10px')
+        .css('text-align', 'center')
+        .css('text-decoration', 'none')
+        .css('float', 'right')
+        .css('display', 'inline-block')
+        // temporary values for setting
+        // stop button and progress bar
+        // on the same line/same height
+        .css('width', '10%')
+        .click(stop_running_job);
+
     var progress_bar = $('<div/>')
         .addClass('progress-bar ' + status_class)
         .attr('role', 'progressbar')
         .attr('aria-valuenow', progress)
         .attr('aria-valuemin', 0)
         .attr('aria-valuemax', 100)
-        .css('width', progress + '%')
+        // temporary values for setting
+        // stop button and progress bar
+        // on the same line/same height
+        .css('width', progress * (9/10) + '%')
+        .css({'min-width': '100px', 'margin-bottom': 0});
     if (status_class == 'progress-bar-warning') {
         progress_bar.text('Loading Spark...');
     } else {
         progress_bar.text(completed + ' out of ' + total + ' tasks');
     };
+    progress_bar_div.append(stop_job_button);
     progress_bar_div.append(progress_bar);
     return progress_bar_div;
 };
@@ -165,10 +204,14 @@ define([
     };
 
     var spark_progress_bar = function(event, data) {
+        // entry point for executing a cell in jupyter notebook
+        // debugger
         var cell = data.cell;
         if (is_spark_cell(cell)) {
             window.clearInterval(current_update_frequency);
             current_update_frequency = window.setInterval(update, UPDATE_FREQUENCY_ACTIVE, api_url);
+            // create cache of cells to update
+            // w/ spark data from spark api
             cell_queue.push(cell);
             current_cell = cell_queue[0];
             add_progress_bar(current_cell);
@@ -176,6 +219,13 @@ define([
     };
 
     var add_progress_bar = function(cell) {
+        // given a code cell that has been executed
+        // add information about the spark job running
+        // to the input area
+        // debugger
+
+        // if there is not a container for the
+        // progress bar in the cell, create one
         var progress_bar_div = cell.element.find('.progress-container');
         if (progress_bar_div.length < 1) {
             var input_area = cell.element.find('.input_area');
@@ -191,8 +241,13 @@ define([
             var progress_bar_container = $('<div/>')
                 .addClass('progress-container')
                 .css({'border': 'none', 'border-top': '1px solid #cfcfcf'})
+            // put delete button under to progress_bar_container
+            // var stop_spark_job = $('<div/>')
+            //   .addClass('stop-job')
+            //   .css({'border': 'none', 'border-top': '1px solid #cfcfcf'})
             progress_bar = create_progress_bar('progress-bar-warning', 1, 5);
-            progress_bar.hide();
+            // stop_job_button = create_stop_job_button()
+            progress_bar.show();
             progress_bar.appendTo(progress_bar_container);
             jobs_completed_container.appendTo(input_area);
             progress_bar_container.appendTo(input_area);
@@ -200,26 +255,33 @@ define([
     };
 
     var update_progress_bar = function() {
+        // debugger
         var job = cache[0].jobs[0];
         var completed = job.numCompletedTasks;
         var total = job.numTasks;
 
-        var progress_bar = current_cell.element.find('.progress');
-        if (progress_bar.length < 1) {
+        var progress_div = current_cell.element.find('.progress');
+        if (progress_div.length < 1) {
             console.log("No progress bar found");
         };
         update_progress_count(current_cell);
-
         var progress = completed / total * 100;
-        progress_bar.attr('class', 'progress');
-        progress_bar.show();
-        progress_bar.addClass('progress-bar ' + get_status_class(job.status))
-                    .attr('aria-valuenow', progress)
-                    .css('width', progress + '%')
-                    .text(completed + ' out of ' + total + ' tasks');
+        var progress_bar = progress_div.find('.progress-bar')
+
+        progress_bar
+        .removeClass()
+        .addClass('progress-bar ' + get_status_class(job.status))
+        .attr('aria-valuenow', progress * (9/10))
+        // temporary values for setting
+        // stop button and progress bar
+        // on the same line/same height
+        // works, but 0 is too small...
+        .css('width', progress * (9/10) + '%')
+        .text(completed + ' out of ' + total + ' tasks');
     };
 
     var update_progress_count = function(cell) {
+        // // debugger
         var progress_count = cell.element.find('.progress_counter');
         if (progress_count.length < 1) {
             console.log("No progress counter found");
@@ -235,6 +297,7 @@ define([
     };
 
     var remove_progress_bar = function() {
+        // debugger
         if (current_cell != null) {
             var progress_bar_div = current_cell.element.find('.progress-container');
             var progress_count = current_cell.element.find('.progress_counter');
@@ -249,6 +312,7 @@ define([
     };
 
     var start_next_progress_bar = function() {
+        // debugger
         cell_queue.shift();
         current_cell = cell_queue[0];
         if (current_cell != null) {
